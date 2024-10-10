@@ -97,20 +97,20 @@ jobs:
           docker push ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:staging
 
       
-  deploy-prod:
-    needs: deploy-staging
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+  # deploy-prod:
+  #   needs: deploy-staging
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v3
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+  #     - name: Log in to Docker Hub
+  #       uses: docker/login-action@v2
+  #       with:
+  #         username: ${{ secrets.DOCKER_HUB_USERNAME }}
+  #         password: ${{ secrets.DOCKER_HUB_PASSWORD }}
 
-      - name: Build and push Docker image
-        run: |
-          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:prod .
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:prod
+  #     - name: Build and push Docker image
+  #       run: |
+  #         docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:prod .
+  #         docker push ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:prod
