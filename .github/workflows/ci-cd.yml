@@ -78,29 +78,13 @@ jobs:
         run: |
           docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:0.1 .
           docker push ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:0.1
-          docker tag ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:0.1 ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:staging
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:staging
 
       - name: Set up SSH Key
         run: |
           echo "${{ secrets.EC2_KEY }}" > ec2-key.pem
           chmod 400 ec2-key.pem
 
-      # Setup Docker permissions on EC2 instance
-      - name: Setup Docker Permissions
-        run: |
-          chmod 400 ec2-key.pem
-          ssh -o StrictHostKeyChecking=no -i ec2-key.pem ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
-            sudo apt-get update
-            sudo apt-get install -y docker.io
-            sudo groupadd docker
-            sudo usermod -aG docker ubuntu
-            sudo systemctl enable docker
-            sudo systemctl start docker
-          EOF
-
-      # Deploy backend to EC2 instance
-      - name: Deploy backend to EC2
+      - name: Deploy backend with PM2 to EC2
         env:
           EC2_USER: ubuntu
           EC2_HOST: ${{ secrets.EC2_HOST }}
@@ -113,31 +97,28 @@ jobs:
         run: |
           chmod 400 ec2-key.pem
           ssh -o StrictHostKeyChecking=no -i ec2-key.pem $EC2_USER@$EC2_HOST "\
-            # Pull the backend and MySQL images
+            # Pull the Docker images
             docker pull ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:0.1 && \
             docker pull mysql:latest && \
 
-            # Create a Docker network if it doesn't exist
+            # Create a Docker network
             sudo docker network create studentms-network || true && \
 
-            # Stop and remove the existing backend container if running
-            sudo docker stop studentms-app || true && \
-            sudo docker rm studentms-app || true && \
+            # Stop and remove existing containers
+            sudo docker stop studentms-app || true && sudo docker rm studentms-app || true && \
+            sudo docker stop mysql-container || true && sudo docker rm mysql-container || true && \
 
-            # Stop and remove the existing MySQL container if running
-            sudo docker stop mysql-container || true && \
-            sudo docker rm mysql-container || true && \
-
-            # Run MySQL container with environment variables
-            sudo docker run -d --name mysql-container \
-              --network studentms-network \
+            # Run MySQL container
+            sudo docker run -d --name mysql-container --network studentms-network \
               -e MYSQL_ROOT_PASSWORD=${DB_PASSWORD} \
               -e MYSQL_DATABASE=${DB_NAME} \
               mysql:latest && \
 
-            # Run backend container and connect it to the same network
-            sudo docker run -d --name studentms-app \
-              --network studentms-network \
+            # Wait for MySQL to start
+            sleep 15 && \
+
+            # Run backend container with PM2
+            sudo docker run -d --name studentms-app --network studentms-network \
               -e DB_HOST=mysql-container \
               -e DB_USER=${DB_USER} \
               -e DB_PASSWORD=${DB_PASSWORD} \
@@ -146,6 +127,7 @@ jobs:
               -e DB_PORT=${DB_PORT} \
               -p 3000:3000 ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:0.1 \
           "
+
 
   build-and-deploy-frontend:
     needs: test

@@ -10,11 +10,14 @@ COPY backend/package*.json ./
 # Install backend dependencies
 RUN npm install
 
+# Install PM2 globally
+RUN npm install pm2 -g
+
 # Copy all backend files
 COPY backend/ ./
 
 # Expose the desired port (e.g., 3000)
 EXPOSE 3000
 
-# Command to run the application
-CMD ["npm", "start"]
+# Start the server using PM2
+CMD ["pm2-runtime", "start", "ecosystem.config.js"]

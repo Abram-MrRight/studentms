@@ -27,5 +27,10 @@ module.exports = app => {
     // fetch detailed payment data
     router.get('/payments-details', cyberschoolController.getPaymentDetails);
 
+    // determine server health status
+    router.get('/health-check', (req, res) => {
+        res.status(200).send('Server is healthy');
+    });
+
     app.use('/api/cyber_school', router)
 }
