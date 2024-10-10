@@ -12,8 +12,11 @@ RUN npm install --prefix frontend
 COPY backend/package*.json backend/
 RUN npm install --prefix backend
 
-# Expose port 3000
-EXPOSE 3000
+# Expose port 3000 for the app and 9090 for Prometheus
+EXPOSE 3000 9090
+
+# Copy Prometheus config
+COPY prometheus.yml /etc/prometheus/prometheus.yml
 
 # Run command to start the application
 CMD ["npm", "start"]
