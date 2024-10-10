@@ -109,8 +109,9 @@ jobs:
 
       - name: Monitor pipeline with Prometheus
         run: |
-          echo "CI duration: ${{ github.run_duration }}" | curl --data-binary @- http://pushgateway:9091/metrics/job/ci_metrics
-
+          DURATION=$(( ${{ github.event.workflow_run.updated_at }} - ${{ github.event.workflow_run.created_at }} ))
+          echo "CI duration: $DURATION" | curl --data-binary @- http://pushgateway:9091/metrics/job/ci_metrics
+    
   deploy-prod:
     needs: deploy-staging
     runs-on: ubuntu-latest
