@@ -57,6 +57,11 @@ jobs:
   deploy-staging:
     needs: build
     runs-on: ubuntu-latest
+    services:
+      pushgateway:
+        image: prom/pushgateway:latest
+        ports:
+          - 9091:9091
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -73,6 +78,17 @@ jobs:
           docker push ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:0.1
           docker tag ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:0.1 ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:staging
           docker push ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:staging
+
+      - name: Wait for Pushgateway to be ready
+        run: |
+          for i in {1..30}; do
+            if curl -s http://localhost:9091/; then
+              echo "Pushgateway is up"
+              break
+            fi
+            echo "Waiting for Pushgateway..."
+            sleep 2
+          done
 
       - name: Monitor pipeline with Prometheus
         run: |
