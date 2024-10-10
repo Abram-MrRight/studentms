@@ -17,8 +17,7 @@ jobs:
       prometheus:
         image: prom/prometheus:latest
         ports:
-          - 9090:9090
-        # Remove the options block and manage the config through a separate step
+          - 9092:9090  # Change the host port to 9092
         env:
           PROMETHEUS_CONFIG: /etc/prometheus/prometheus.yml
 
@@ -48,7 +47,7 @@ jobs:
       - name: Start Prometheus with custom config
         run: |
           docker run -d --name prometheus \
-            -p 9090:9090 \
+            -p 9092:9090 \  # Change the host port to 9092
             -v ${{ github.workspace }}/prometheus_config/prometheus.yml:/etc/prometheus/prometheus.yml \
             prom/prometheus:latest
 
