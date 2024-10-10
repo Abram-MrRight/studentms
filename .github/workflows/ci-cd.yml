@@ -18,8 +18,7 @@ jobs:
         image: prom/prometheus:latest
         ports:
           - 9090:9090
-        options: >-
-          --volume ${{ github.workspace }}/prometheus.yml:/etc/prometheus/prometheus.yml
+        # Remove the options block and manage the config through a separate step
         env:
           PROMETHEUS_CONFIG: /etc/prometheus/prometheus.yml
 
@@ -39,6 +38,19 @@ jobs:
       - name: Install backend dependencies
         working-directory: backend
         run: npm install
+
+      - name: Create Prometheus config directory
+        run: mkdir -p ${{ github.workspace }}/prometheus_config
+
+      - name: Copy Prometheus config
+        run: cp ${{ github.workspace }}/prometheus.yml ${{ github.workspace }}/prometheus_config/prometheus.yml
+
+      - name: Start Prometheus with custom config
+        run: |
+          docker run -d --name prometheus \
+            -p 9090:9090 \
+            -v ${{ github.workspace }}/prometheus_config/prometheus.yml:/etc/prometheus/prometheus.yml \
+            prom/prometheus:latest
 
   build:
     needs: test
