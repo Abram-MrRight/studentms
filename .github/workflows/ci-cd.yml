@@ -20,9 +20,8 @@ jobs:
           - 9090:9090
         options: >-
           --volume ${{ github.workspace }}/prometheus.yml:/etc/prometheus/prometheus.yml
-        # Optionally set the command if needed
         env:
-          - PROMETHEUS_CONFIG=/etc/prometheus/prometheus.yml
+          PROMETHEUS_CONFIG: /etc/prometheus/prometheus.yml  # Corrected to use mapping
 
     steps:
       - name: Checkout code
