@@ -1,5 +1,4 @@
-
-name: CI/CD Pipeline
+name: CI/CD Pipeline with Monitoring
 
 on:
   push:
@@ -25,22 +24,6 @@ jobs:
       - name: Install backend dependencies
         working-directory: backend
         run: npm install
-
-      # - name: Run unit tests (Jest)
-      #   working-directory: frontend
-      #   run: npm run test
-
-      # - name: Run integration tests (Jest)
-      #   working-directory: backend
-      #   run: npm run test
-
-      # - name: Run ESLint
-      #   working-directory: frontend
-      #   run: npm run lint
-
-      # - name: Run ESLint
-      #   working-directory: backend
-      #   run: npm run lint
 
   build:
     needs: test
@@ -72,11 +55,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+
       - name: Build and push Docker image
         run: |
           docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:0.1 .
@@ -84,29 +69,24 @@ jobs:
           docker tag ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:0.1 ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:staging
           docker push ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:staging
 
+      - name: Monitor pipeline with Prometheus
+        run: |
+          echo "CI duration: ${{ github.run_duration }}" | curl --data-binary @- http://localhost:9091/metrics/job/ci_metrics
+
   deploy-prod:
     needs: deploy-staging
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
-      - name: Deploy to production
+
+      - name: Build and push Docker image
         run: |
-          # Deploy script
           docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:prod .
           docker push ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:prod
-          # Rollback script
-          docker tag ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:prod ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:prod-rollback
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:prod-rollback
-
-
-#Monitoring and Logging Configuration:
-# Prometheus configuration
-
-
-
