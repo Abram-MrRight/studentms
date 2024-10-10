@@ -47,9 +47,9 @@ jobs:
       - name: Start Prometheus with custom config
         run: |
           docker run -d --name prometheus \
-            -p 9092:9090 \
-            -v ${{ github.workspace }}/prometheus_config/prometheus.yml:/etc/prometheus/prometheus.yml \
-            prom/prometheus:latest
+          -p 9093:9090 \
+          -v ${{ github.workspace }}/prometheus_config/prometheus.yml:/etc/prometheus/prometheus.yml \
+          prom/prometheus:latest
 
 
   build:
