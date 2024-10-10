@@ -109,8 +109,8 @@ jobs:
 
       - name: Monitor pipeline with Prometheus
         run: |
-          start_time=$(date -d "${{ github.event.workflow_run.created_at }}" +%s)
-          end_time=$(date -d "${{ github.event.workflow_run.updated_at }}" +%s)
+          start_time=$(date -d "${{ github.run_started_at }}" +%s)
+          end_time=$(date +%s)
           DURATION=$(( end_time - start_time ))
           echo "CI duration: ${DURATION}" | curl --data-binary @- http://pushgateway:9091/metrics/job/ci_metrics
  
