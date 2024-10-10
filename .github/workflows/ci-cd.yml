@@ -96,24 +96,7 @@ jobs:
           docker tag ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:0.1 ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:staging
           docker push ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:staging
 
-      - name: Wait for Pushgateway to be ready
-        run: |
-          for i in {1..30}; do
-            if curl -s http://localhost:9091/; then
-              echo "Pushgateway is up"
-              break
-            fi
-            echo "Waiting for Pushgateway..."
-            sleep 2
-          done
-
-      - name: Monitor pipeline with Prometheus
-        run: |
-          start_time=$(date -d "${{ github.run_started_at }}" +%s)
-          end_time=$(date +%s)
-          DURATION=$(( end_time - start_time ))
-          echo "CI duration: ${DURATION}" | curl --data-binary @- http://pushgateway:9091/metrics/job/ci_metrics
- 
+      
   deploy-prod:
     needs: deploy-staging
     runs-on: ubuntu-latest
