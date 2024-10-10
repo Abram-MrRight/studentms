@@ -1,10 +1,10 @@
 const db_config = {
-    host: 'localhost',
-    user: 'root',
-    password: '',
-    database: 'cyber_school',
-    dialect: 'mysql',
-    port: 3306,
+    host: process.env.DB_HOST || 'mysql-container',
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    database: process.env.DB_NAME || 'cyber_school',
+    dialect: process.env.DB_DIALECT || 'mysql',
+    port: process.env.DB_PORT || 3306,
     pool: { 
         max: 10,
         min: 0,
@@ -13,5 +13,4 @@ const db_config = {
     }
 };
 
-// Export the pool for use in other parts of the application
 module.exports = db_config;

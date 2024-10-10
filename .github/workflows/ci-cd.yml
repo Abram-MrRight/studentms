@@ -1,4 +1,4 @@
-name: CI/CD Pipeline with Monitoring
+name: CI/CD Pipeline
 
 on:
   push:
@@ -8,76 +8,61 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+
     services:
-      pushgateway:
-        image: prom/pushgateway:latest
-        ports:
-          - 9091:9091
-
-      prometheus:
-        image: prom/prometheus:latest
-        ports:
-          - 9092:9090  # Change the host port to 9092
+      mysql:
+        image: mysql:latest
         env:
-          PROMETHEUS_CONFIG: /etc/prometheus/prometheus.yml
+          MYSQL_ROOT_PASSWORD: root_password
+          MYSQL_DATABASE: test_db
+          MYSQL_USER: test_user
+          MYSQL_PASSWORD: test_password
+        options: --health-cmd="mysqladmin ping --silent" --health-interval=10s --health-timeout=5s --health-retries=3
+        ports:
+          - 3306:3306
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v2
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '20'
+    - name: Set up Node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: '20'
 
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: npm install
+    - name: Install backend dependencies
+      run: |
+        cd backend
+        npm install
 
-      - name: Install backend dependencies
-        working-directory: backend
-        run: npm install
+    - name: Install frontend dependencies
+      run: |
+        cd frontend
+        npm install
 
-      - name: Create Prometheus config directory
-        run: mkdir -p ${{ github.workspace }}/prometheus_config
+    - name: Wait for MySQL to be ready
+      run: |
+        until mysqladmin ping -h"127.0.0.1" -u"test_user" -p"test_password" --silent; do
+          echo "Waiting for MySQL..."
+          sleep 5
+        done
 
-      - name: Copy Prometheus config
-        run: cp ${{ github.workspace }}/prometheus.yml ${{ github.workspace }}/prometheus_config/prometheus.yml
+    - name: Run backend tests
+      env:
+        DB_HOST: 127.0.0.1
+        DB_PORT: 3306
+        DB_USER: test_user
+        DB_PASSWORD: test_password
+        DB_NAME: test_db
+      working-directory: backend
+      run: npm test
 
-      - name: Start Prometheus with custom config
-        run: |
-          docker run -d --name prometheus \
-          -p 9093:9090 \
-          -v ${{ github.workspace }}/prometheus_config/prometheus.yml:/etc/prometheus/prometheus.yml \
-          prom/prometheus:latest
+    - name: Run frontend tests
+      working-directory: frontend
+      run: npm test
 
-
-  build:
+  deploy-backend:
     needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '20'
-
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: npm install
-
-      - name: Install backend dependencies
-        working-directory: backend
-        run: npm install
-
-      - name: Build frontend
-        working-directory: frontend
-        run: npm run build
-
-  deploy-staging:
-    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -96,38 +81,100 @@ jobs:
           docker tag ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:0.1 ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:staging
           docker push ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:staging
 
-      - name: Wait for Pushgateway to be ready
+      - name: Set up SSH Key
         run: |
-          for i in {1..30}; do
-            if curl -s http://localhost:9091/; then
-              echo "Pushgateway is up"
-              break
-            fi
-            echo "Waiting for Pushgateway..."
-            sleep 2
-          done
+          echo "${{ secrets.EC2_KEY }}" > ec2-key.pem
+          chmod 400 ec2-key.pem
 
-      - name: Monitor pipeline with Prometheus
+      # Setup Docker permissions on EC2 instance
+      - name: Setup Docker Permissions
         run: |
-          start_time=$(date -d "${{ github.run_started_at }}" +%s)
-          end_time=$(date +%s)
-          DURATION=$(( end_time - start_time ))
-          echo "CI duration: ${DURATION}" | curl --data-binary @- http://pushgateway:9091/metrics/job/ci_metrics
- 
-  deploy-prod:
-    needs: deploy-staging
+          chmod 400 ec2-key.pem
+          ssh -o StrictHostKeyChecking=no -i ec2-key.pem ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
+            sudo apt-get update
+            sudo apt-get install -y docker.io
+            sudo groupadd docker
+            sudo usermod -aG docker ubuntu
+            sudo systemctl enable docker
+            sudo systemctl start docker
+          EOF
+
+      # Deploy backend to EC2 instance
+      - name: Deploy backend to EC2
+        env:
+          EC2_USER: ubuntu
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_KEY: ${{ secrets.EC2_KEY }}
+          DB_USER: root
+          DB_PASSWORD: my-secret-pw
+          DB_NAME: cyber_school
+          DB_DIALECT: mysql
+          DB_PORT: 3306
+        run: |
+          chmod 400 ec2-key.pem
+          ssh -o StrictHostKeyChecking=no -i ec2-key.pem $EC2_USER@$EC2_HOST "\
+            # Pull the backend and MySQL images
+            docker pull ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:0.1 && \
+            docker pull mysql:latest && \
+
+            # Create a Docker network if it doesn't exist
+            sudo docker network create studentms-network || true && \
+
+            # Stop and remove the existing backend container if running
+            sudo docker stop studentms-app || true && \
+            sudo docker rm studentms-app || true && \
+
+            # Stop and remove the existing MySQL container if running
+            sudo docker stop mysql-container || true && \
+            sudo docker rm mysql-container || true && \
+
+            # Run MySQL container with environment variables
+            sudo docker run -d --name mysql-container \
+              --network studentms-network \
+              -e MYSQL_ROOT_PASSWORD=${DB_PASSWORD} \
+              -e MYSQL_DATABASE=${DB_NAME} \
+              mysql:latest && \
+
+            # Run backend container and connect it to the same network
+            sudo docker run -d --name studentms-app \
+              --network studentms-network \
+              -e DB_HOST=mysql-container \
+              -e DB_USER=${DB_USER} \
+              -e DB_PASSWORD=${DB_PASSWORD} \
+              -e DB_NAME=${DB_NAME} \
+              -e DB_DIALECT=${DB_DIALECT} \
+              -e DB_PORT=${DB_PORT} \
+              -p 3000:3000 ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:0.1 \
+          "
+
+  build-and-deploy-frontend:
+    needs: test
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
+      - name: Checkout repository
+        uses: actions/checkout@v2
         with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+          ref: main
 
-      - name: Build and push Docker image
-        run: |
-          docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:prod .
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:prod
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Install Netlify CLI
+        run: npm install -g netlify-cli
+
+      - name: Deploy frontend to Netlify
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        working-directory: frontend
+        run: netlify deploy --prod --dir=dist

@@ -4,19 +4,17 @@ FROM node:20
 # Set the working directory to /app
 WORKDIR /app
 
-# Copy frontend files and install dependencies
-COPY frontend/package*.json frontend/
-RUN npm install --prefix frontend
+# Copy backend package.json and package-lock.json
+COPY backend/package*.json ./
 
-# Copy backend files and install dependencies
-COPY backend/package*.json backend/
-RUN npm install --prefix backend
+# Install backend dependencies
+RUN npm install
 
-# Expose port 3000 for the app and 9090 for Prometheus
-EXPOSE 3000 9090
+# Copy all backend files
+COPY backend/ ./
 
-# Copy Prometheus config
-COPY prometheus.yml /etc/prometheus/prometheus.yml
+# Expose the desired port (e.g., 3000)
+EXPOSE 3000
 
-# Run command to start the application
+# Command to run the application
 CMD ["npm", "start"]
