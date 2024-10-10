@@ -1,0 +1,10 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'studentms-app'
+    static_configs:
+      - targets: ['localhost:3000'] # Node.js app
+  - job_name: 'ci-cd-monitoring'
+    static_configs:
+      - targets: ['localhost:9090'] # Prometheus monitoring
