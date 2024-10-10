@@ -19,7 +19,7 @@ jobs:
         ports:
           - 9090:9090
         options: >-
-          --volume ${{ github.workspace }}/prometheus.yml:/etc/prometheus/prometheus.yml
+          --mount type=bind,source=${{ github.workspace }}/prometheus.yml,target=/etc/prometheus/prometheus.yml
         env:
           PROMETHEUS_CONFIG: /etc/prometheus/prometheus.yml  # Corrected to use mapping
 
