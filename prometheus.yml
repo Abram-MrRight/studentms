@@ -2,9 +2,10 @@ global:
   scrape_interval: 15s
 
 scrape_configs:
-  - job_name: 'studentms-app'
+  - job_name: 'prometheus'
     static_configs:
-      - targets: ['localhost:3000'] # Node.js app
-  - job_name: 'ci-cd-monitoring'
+      - targets: ['localhost:9090']
+
+  - job_name: 'pushgateway'
     static_configs:
-      - targets: ['localhost:9090'] # Prometheus monitoring
+      - targets: ['pushgateway:9091']
