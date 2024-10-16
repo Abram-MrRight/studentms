@@ -1,4 +1,4 @@
-name: CI/CD Pipeline with Monitoring
+name: CI/CD Pipeline
 
 on:
   push:
@@ -8,18 +8,6 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    services:
-      pushgateway:
-        image: prom/pushgateway:latest
-        ports:
-          - 9091:9091
-
-      prometheus:
-        image: prom/prometheus:latest
-        ports:
-          - 9092:9090  # Change the host port to 9092
-        env:
-          PROMETHEUS_CONFIG: /etc/prometheus/prometheus.yml
 
     steps:
       - name: Checkout code
@@ -37,20 +25,6 @@ jobs:
       - name: Install backend dependencies
         working-directory: backend
         run: npm install
-
-      - name: Create Prometheus config directory
-        run: mkdir -p ${{ github.workspace }}/prometheus_config
-
-      - name: Copy Prometheus config
-        run: cp ${{ github.workspace }}/prometheus.yml ${{ github.workspace }}/prometheus_config/prometheus.yml
-
-      - name: Start Prometheus with custom config
-        run: |
-          docker run -d --name prometheus \
-          -p 9093:9090 \
-          -v ${{ github.workspace }}/prometheus_config/prometheus.yml:/etc/prometheus/prometheus.yml \
-          prom/prometheus:latest
-
 
   build:
     needs: test
@@ -89,18 +63,11 @@ jobs:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
 
-
       - name: Tag and push current stable image
         run: |
-        # Pull the current stable version
-        docker pull ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:staging || true
-        # Tag the stable image
-        docker tag ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:staging ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:stable
-        # Push the stable image
-        docker push ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:stable
-
-
-
+          docker pull ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:staging || true
+          docker tag ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:staging ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:stable
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:stable
 
       - name: Build and push Docker image
         run: |
@@ -109,54 +76,35 @@ jobs:
           docker tag ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:0.1 ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:staging
           docker push ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:staging 
 
-
       - name: Check deployment status
         run: |
-        if [ "$(docker inspect -f {{.State.Health.Status}} ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:staging)" != "healthy" ]; then
-        echo "Deployment failed. Rolling back to stable version."
-        docker pull ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:stable
-        docker run -d --name studentms-app ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:stable
-        else
-        echo "Deployment successful."
-      
-  # deploy-prod:
-  #   needs: deploy-staging
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v3
+          if [ "$(docker inspect -f '{{.State.Health.Status}}' studentms-app)" != "healthy" ]; then
+            echo "Deployment failed. Rolling back to stable version."
+            docker pull ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:stable
+            docker run -d --name studentms-app ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:stable
+          else
+            echo "Deployment successful."
+          fi
 
-  #     - name: Log in to Docker Hub
-  #       uses: docker/login-action@v2
-  #       with:
-  #         username: ${{ secrets.DOCKER_HUB_USERNAME }}
-  #         password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+  deploy-prod:
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-  #     - name: Build and push Docker image
-  #       run: |
-  #         docker build -t ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:prod .
-  #         docker push ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:prod
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
 
+      - name: Tag and push production Docker image
+        run: |
+          docker pull ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:staging || true
+          docker tag ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:staging ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:prod
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:prod
 
-deploy-prod:
-  needs: deploy-staging
-  runs-on: ubuntu-latest
-  steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v2
-      with:
-        username: ${{ secrets.DOCKER_HUB_USERNAME }}
-        password: ${{ secrets.DOCKER_HUB_PASSWORD }}
-
-    - name: Tag and push production Docker image
-      run: |
-        docker pull ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:staging || true
-        docker tag ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:staging ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:prod
-        docker push ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:prod
-
-    - name: Deploy to production
-      run: |
-        docker run -d --name studentms-app-prod ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:prod
+      - name: Deploy to production
+        run: |
+          docker run -d --name studentms-app-prod ${{ secrets.DOCKER_HUB_USERNAME }}/studentms-app:prod
