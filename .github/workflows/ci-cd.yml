@@ -84,7 +84,7 @@ jobs:
           echo "${{ secrets.EC2_KEY }}" > ec2-key.pem
           chmod 400 ec2-key.pem
 
-      - name: Deploy backend with PM2 to EC2
+      - name: Deploy backend to EC2
         env:
           EC2_USER: ubuntu
           EC2_HOST: ${{ secrets.EC2_HOST }}
@@ -117,7 +117,7 @@ jobs:
             # Wait for MySQL to start
             sleep 15 && \
 
-            # Run backend container with PM2
+            # Run backend container
             sudo docker run -d --name studentms-app --network studentms-network \
               -e DB_HOST=mysql-container \
               -e DB_USER=${DB_USER} \
@@ -138,7 +138,7 @@ jobs:
         with:
           ref: prod_env
 
-      - name: Set up Node.js
+      - name: Set up Node.js and npm
         uses: actions/setup-node@v3
         with:
           node-version: '20'
