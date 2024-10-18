@@ -115,6 +115,7 @@
 
 <script>
   import ApiService from '../services/ApiService'
+  import axios from 'axios'; // Import axios for logging
 
   export default {
     name: 'AddStudent',
@@ -160,6 +161,8 @@
           this.resetForm();
         } catch (error) {
           console.error('Error adding student:', error);
+          // Log error to backend
+          this.logErrorToBackend(error);
         } finally {
           this.loading = false;
         }
@@ -172,6 +175,17 @@
       dismissStudentDetails() {
         this.showStudentDetails = false;
         this.newStudent = null;
+      },
+
+      // New method for logging errors
+      logErrorToBackend(error) {
+        axios.post('http://localhost:3001/api/logs', { error }) // Adjust this URL to match your logging endpoint
+          .then(response => {
+            console.log('Logged error:', response.data);
+          })
+          .catch(err => {
+            console.error('Failed to log error:', err);
+          });
       },
 
       resetForm() {
