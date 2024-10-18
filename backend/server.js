@@ -4,7 +4,8 @@ const port = 3001;
 const db = require('./models');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const populateDatabase = require('./models/populate')
+const populateDatabase = require('./models/populate');
+const { requestLogger, errorLogger } = require('./loggerMiddleware'); // Import both logging middlewares
 
 const cors_options = {
   origin: '*',
@@ -16,6 +17,9 @@ app.use(cors(cors_options)); // Apply CORS middleware at the top
 app.use(express.json());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+
+// Use request logging middleware
+app.use(requestLogger); 
 
 // Preflight requests
 app.options('*', cors(cors_options));
@@ -48,5 +52,22 @@ db.sequelize.sync({ force: false }).then(async () => {
 }).catch((error) => {
   console.error('Unable to synchronize the database:', error);
 });
+
+// Add error logging middleware after your routes
+app.use(errorLogger); // Use error logging middleware
+app.get('/', (req, res) => {
+  res.send('Welcome to the Cyber School API!'); // This is a simple message
+});
+
+const logger = require('./fluentLogger');
+
+// Example of logging an error
+function someFunction() {
+    try {
+        // Your code here
+    } catch (error) {
+        logger.error('error_message', { error: error.message });
+    }
+}
 
 module.exports = app;

@@ -20,13 +20,14 @@
     "@fortawesome/free-solid-svg-icons": "^6.5.2",
     "@fortawesome/vue-fontawesome": "^3.0.8",
     "@popperjs/core": "^2.11.8",
-    "axios": "^1.7.2",
+    "axios": "^1.7.7",
     "bootstrap": "^5.3.0",
     "core-js": "^3.8.3",
     "cyber_school_frontend_web": "file:",
     "lodash": "^4.17.21",
     "vue": "^3.2.13",
-    "vue-router": "^4.0.13"
+    "vue-router": "^4.0.13",
+    "winston": "^3.15.0"
   },
   "devDependencies": {
     "@babel/core": "^7.12.16",
